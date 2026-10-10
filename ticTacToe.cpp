@@ -26,6 +26,12 @@ class Game {
         Player CurrentPlayer;
         Player P1, P2;
 
+        const vector<vector<int>> winCondition = {
+                {0, 1, 2}, {3, 4, 5}, {6, 7, 8},
+                {0, 3, 6}, {1, 4, 7}, {2, 5, 8},
+                {0, 4, 8}, {2, 4, 6}
+            };
+
         bool isBoardFull() {
             //return true if there is no valid moves
             return (getValidMoves().size() == 0) ? true : false;
@@ -40,12 +46,6 @@ class Game {
         }
         
         bool checkWin(char currentDesig) {
-            const vector<vector<int>> winCondition = {
-                {0, 1, 2}, {3, 4, 5}, {6, 7, 8},
-                {0, 3, 6}, {1, 4, 7}, {2, 5, 8},
-                {0, 4, 8}, {3, 4, 6}
-            };
-
             for(int i = 0; i < 8; i++) {
                 int count = 0;
                 for(int j = 0; j < 3; j++) {
@@ -61,6 +61,16 @@ class Game {
             return false;
         }
 
+        bool checkWinTempBoard(vector<char> tempBoard, char desig) {
+            for(int i = 0; i < 8; i++) {
+                if(tempBoard[winCondition[i][0]] == desig && tempBoard[winCondition[i][1]] == desig && tempBoard[winCondition[i][2]] == desig) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         bool checkValidMove(int pos) {
             vector<int> validMoves = getValidMoves();
             for(int i = 0; i < validMoves.size(); i++) {
@@ -68,6 +78,56 @@ class Game {
             }
 
             return false;
+        }
+
+        int winThreat(vector<char> tempBoard, char desig) {
+            int threat = 0;
+            for(int i = 0; i < 8; i++) {
+                int countDesig = 0, countEmpty = 0;
+                for(int j = 0; j < 3; j++) {
+                    if(tempBoard[winCondition[i][j]] == desig) countDesig++;
+                    else if(tempBoard[winCondition[i][j]] == '.') countEmpty++;
+                }
+
+                if(countDesig == 2 && countEmpty == 1) {
+                    threat++;
+                }
+            }
+
+            return threat;
+        }
+
+        void clearBoard() {
+            board = vector<char>(9, '.');
+        }
+
+        int AIMove(char aiDesig, char playerDesig) {
+            vector<int> validMove = getValidMoves();
+
+            //Win in 1
+            for(int i = 0; i < validMove.size(); i++) {
+                vector<char> tempBoard = board;
+                tempBoard[validMove[i]] = aiDesig;
+                if(checkWinTempBoard(tempBoard, aiDesig)) return validMove[i];
+            }
+
+            //Block player winning
+            for(int i = 0; i < validMove.size(); i++) {
+                vector<char> tempBoard = board;
+                tempBoard[validMove[i]] = playerDesig;
+                if(checkWinTempBoard(tempBoard, playerDesig)) return validMove[i];
+            }
+
+            //AI Fork
+            for(int i = 0; i < validMove.size(); i++) {
+                vector<char> tempBoard = board;
+                tempBoard[validMove[i]] = aiDesig;
+                if(winThreat(tempBoard, aiDesig) >= 2) return validMove[i];
+            }
+
+            //Random move
+            random_shuffle(&validMove[0], &validMove[validMove.size() - 1]);
+            return validMove[0];
         }
     public:
         Game() {
@@ -80,6 +140,12 @@ class Game {
             printf("%c %c %c\n", board[6], board[7], board[8]);
 
             cout << "Current player: " << CurrentPlayer.getName() << "\n";
+        }
+
+        void printBoardNoCurr() {
+            printf("%c %c %c\n", board[0], board[1], board[2]);
+            printf("%c %c %c\n", board[3], board[4], board[5]);
+            printf("%c %c %c\n", board[6], board[7], board[8]);
         }
 
         void play(Player P1, Player P2) {
@@ -96,12 +162,30 @@ class Game {
             gameLoop();
         }
 
-        void clearBoard() {
-            board = vector<char>(9, '.');
+        void gameModeChoose() {
+            system("clear");
+            cout << "Choose: \n 1. Player vs Player\n 2. Player vs AI\n";
+            int choose; 
+            do{
+                cin >> choose;
+
+                if(choose != 1 && choose != 2) cout << "Invalid input. Try again\n";
+            } while(choose != 1 && choose != 2);
+
+            if (choose == 1) {
+                Player p1("Player1", 'X');
+                Player p2("Player2", 'O');
+                play(p1, p2);
+            } else {
+                Player p1("Player1", 'X');
+                Player p2("AI", 'O');
+                play(p1, p2);
+            }
         }
 
+        
+
         void gameLoop() {
-            loop:
             clearBoard();
             while(!isBoardFull()) {
                 string currentName = CurrentPlayer.getName();
@@ -149,9 +233,27 @@ class Game {
                     CurrentPlayer = P1;
                 }
 
+                //AI System
+                if(currentName == "AI") {
+                    //Take middle if possible
+                    if(board[4] == '.') {
+                        board[4] = currentDesig;
+                        goto endai;
+                    }
+
+                    //Calculate all valid move and produce smth out of it
+                    board[AIMove(currentDesig, P1.getDesig())] = currentDesig;
+
+                    endai:
+                    //Change current to the other person
+                    CurrentPlayer = P1;
+                }
+
+                
                 //Check win condition
                 if(checkWin(currentDesig)) {
                     cout << currentName << " Won!!!" << "\n";
+                    printBoardNoCurr();
                     break;
                 }
             }
@@ -159,6 +261,7 @@ class Game {
             //Check if it's broken bcs of full board or a win
             if(isBoardFull()) {
                 cout << "The result is a Draw" << "\n";
+                printBoardNoCurr();
             } 
 
             //play again
@@ -167,15 +270,12 @@ class Game {
             if(inst < 'a') inst += ('a' - 'A');
 
             if(inst == 'y') {
-                goto loop;
+                gameModeChoose();
             }
         }
 };
 
 int main() {
     Game game;
-    Player p1("Player1", 'X');
-    Player p2("Player2", 'O');
-    
-    game.play(p1, p2);
+    game.gameModeChoose();
 }
